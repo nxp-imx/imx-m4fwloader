@@ -47,6 +47,8 @@
 #define NAME_OF_UTILITY "i.MX M4 Loader"
 #define HEADER NAME_OF_UTILITY " - M4 firmware loader v. " VERSION "\n"
 
+#define IMX8M_M4_BOOTROM         (0x007E0000) 
+
 #define IMX7D_SRC_M4RCR          (0x3039000C) /* reset register */
 #define IMX7D_STOP_CLEAR_MASK    (0xFFFFFF00)
 #define IMX7D_STOP_SET_MASK      (0x000000AA)
@@ -107,7 +109,7 @@ void regshow(uint32_t addr, char* name, int fd)
     target = (off_t)addr;
     map_base = mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, fd, target & ~MAP_MASK);
     virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
-    LogVerbose("%s (0x%08X): 0x%08X\r\n", name, addr, *((unsigned long*)virt_addr));
+    LogVerbose("%s (0x%08X): 0x%08X\r\n", name, addr, *((uint32_t*)virt_addr));
     munmap(map_base, MAP_SIZE);
 }
 
@@ -160,7 +162,24 @@ void imx7d_clk_enable(int fd)
     LogVerbose("CCM_CCGR1_SET done\n");
 }
 
+void imx8m_clk_enable(int fd) {
+
+}
+
 static struct soc_specific socs[] = {
+    {
+        "i.MX8M",
+        IMX7D_SRC_M4RCR,
+        IMX7D_STOP_CLEAR_MASK,
+        IMX7D_STOP_SET_MASK,
+        IMX7D_START_CLEAR_MASK,
+        IMX7D_START_SET_MASK,
+        IMX7D_MU_ATR1,
+
+        imx8m_clk_enable,
+
+        IMX8M_M4_BOOTROM
+    },
     {
         "i.MX7 Dual",
         IMX7D_SRC_M4RCR,
@@ -223,15 +242,15 @@ void stop_cpu(int fd, int socid)
     target = (off_t)socs[socid].src_m4reg_addr;
     map_base = mmap(0, SIZE_4BYTE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
     virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
-    read_result = *((unsigned long*)virt_addr);
-    *((unsigned long*)virt_addr) = (read_result & (socs[socid].stop_and)) | socs[socid].stop_or;
+    read_result = *((uint32_t*)virt_addr);
+    *((uint32_t*)virt_addr) = (read_result & (socs[socid].stop_and)) | socs[socid].stop_or;
     munmap(virt_addr, SIZE_4BYTE);
     regshow(socs[socid].src_m4reg_addr, "STOP - after", fd);
 }
 
 void start_cpu(int fd, int socid)
 {
-    unsigned long read_result;
+    uint32_t read_result;
     off_t target;
     void *map_base, *virt_addr;
 
@@ -242,8 +261,8 @@ void start_cpu(int fd, int socid)
     target = (off_t)socs[socid].src_m4reg_addr;
     map_base = mmap(0, SIZE_4BYTE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
     virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
-    read_result = *((unsigned long*)virt_addr);
-    *((unsigned long*)virt_addr) = (read_result & (socs[socid].start_and)) | socs[socid].start_or;
+    read_result = *((uint32_t*)virt_addr);
+    *((uint32_t*)virt_addr) = (read_result & (socs[socid].start_and)) | socs[socid].start_or;
     munmap(virt_addr, SIZE_4BYTE);
     regshow(socs[socid].src_m4reg_addr, "START -after", fd);
 }
@@ -251,13 +270,13 @@ void start_cpu(int fd, int socid)
 void set_stack_pc(int fd, int socid, unsigned int stack, unsigned int pc)
 {
     off_t target = (off_t)socs[socid].stack_pc_addr;
-    unsigned long read_result;
+    uint32_t read_result;
     void *map_base, *virt_addr;
     map_base = mmap(0, SIZE_16BYTE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
     virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
-    *((unsigned long*)virt_addr) = stack;
+    *((uint32_t*)virt_addr) = stack;
     virt_addr = (unsigned char*)(map_base + ((target + 0x4) & MAP_MASK));
-    *((unsigned long*)virt_addr) = pc;
+    *((uint32_t*)virt_addr) = pc;
     munmap(map_base, SIZE_16BYTE);
 }
 
@@ -268,7 +287,7 @@ int load_m4_fw(int fd, int socid, char* filepath, unsigned int loadaddr)
     FILE* fdf;
     off_t target;
     char* filebuffer;
-    void *map_base, *virt_addr;
+    char *map_base, *virt_addr;
     unsigned long stack, pc;
 
     fdf = fopen(filepath, "rb");
@@ -298,7 +317,9 @@ int load_m4_fw(int fd, int socid, char* filepath, unsigned int loadaddr)
     map_base = mmap(0, MAP_OCRAM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, loadaddr & ~MAP_OCRAM_MASK);
     LogVerbose("%s - start - end (0x%08x - 0x%08x)\n", NAME_OF_UTILITY, loadaddr & ~MAP_OCRAM_MASK, (loadaddr & ~MAP_OCRAM_MASK) + MAP_OCRAM_SIZE);
     virt_addr = (unsigned char*)(map_base + (loadaddr & MAP_OCRAM_MASK));
-    memcpy(virt_addr, filebuffer, size);
+    for(int i = 0; i < size; i++) {
+      *virt_addr++ = filebuffer[i];
+    }
     munmap(map_base, MAP_OCRAM_SIZE);
 
     LogVerbose("Will set PC and STACK...");
@@ -329,6 +350,24 @@ int get_board_id(void)
                 }
             }
             break;
+        }
+    }
+
+    fclose(fp);
+    if(result >= 0) {
+        return result;
+    }
+
+    fp = fopen("/proc/device-tree/model", "r");
+    if(fp == NULL) {
+        return -1;
+    }
+
+    for (i = 0; i < (sizeof(socs) / sizeof(struct soc_specific)); i++) {
+        fgets(out, sizeof(out) - 1, fp);
+        if(strstr(out, socs[i].detect_name)) {
+           result = i;
+           break;
         }
     }
 
