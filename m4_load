@@ -1,0 +1,10 @@
+#!/bin/sh
+if [ -z "$1" ]; then
+  echo "Usage: $0 path/to/m4.bin" 1>&2
+  exit 1
+fi
+
+m4fwloader stop
+rmmod imx_rpmsg
+modprobe imx_rpmsg
+m4fwloader "$1" 0x7e0000
