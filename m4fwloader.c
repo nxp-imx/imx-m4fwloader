@@ -168,7 +168,7 @@ void imx8m_clk_enable(int fd) {
 
 static struct soc_specific socs[] = {
     {
-        "i.MX8M",
+        "MX8M",
         IMX7D_SRC_M4RCR,
         IMX7D_STOP_CLEAR_MASK,
         IMX7D_STOP_SET_MASK,
