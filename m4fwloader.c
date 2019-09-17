@@ -220,7 +220,7 @@ void rpmsg_mu_kick(int fd, int socid, uint32_t vq_id)
     map_base = mmap(0, SIZE_4BYTE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
     virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
     vq_id = (vq_id << 16);
-    *((unsigned long*)virt_addr) = vq_id;
+    *((uint32_t*) virt_addr) = vq_id;
     munmap(map_base, SIZE_4BYTE);
 }
 
