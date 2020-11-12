@@ -47,9 +47,19 @@
 #define NAME_OF_UTILITY "i.MX M4 Loader"
 #define HEADER NAME_OF_UTILITY " - M4 firmware loader v. " VERSION "\n"
 
-#define IMX8M_M4_BOOTROM         (0x007E0000)
 
 #define IMX8MM_CCM_TARGET_ROOT1  (0x30388080)
+#define IMX8MM_SRC_M4RCR         (0x3039000C) /* reset register */
+#define IMX8MM_SRC_M4RCR_ENABLE_M4           (0x08)
+#define IMX8MM_SRC_M4RCR_SW_M4P_RST          (0x04)
+#define IMX8MM_SRC_M4RCR_SW_M4C_RST          (0x02)
+#define IMX8MM_SRC_M4RCR_SW_M4C_NON_SCLR_RST (0x01)
+#define IMX8MM_START_CLEAR_MASK  (~(IMX8MM_SRC_M4RCR_SW_M4P_RST | IMX8MM_SRC_M4RCR_SW_M4C_RST | IMX8MM_SRC_M4RCR_SW_M4C_NON_SCLR_RST))
+#define IMX8MM_START_SET_MASK    (IMX8MM_SRC_M4RCR_ENABLE_M4 | IMX8MM_SRC_M4RCR_SW_M4C_RST)
+#define IMX8MM_STOP_CLEAR_MASK   (IMX8MM_START_CLEAR_MASK)
+#define IMX8MM_STOP_SET_MASK     (IMX8MM_SRC_M4RCR_SW_M4C_NON_SCLR_RST)
+#define IMX8MM_MU_ATR1           (0x30AA0004) /* rpmsg_mu_kick_addr */
+#define IMX8M_M4_BOOTROM         (0x007E0000)
 
 #define IMX7D_SRC_M4RCR          (0x3039000C) /* reset register */
 #define IMX7D_STOP_CLEAR_MASK    (0xFFFFFF00)
@@ -191,12 +201,12 @@ void imx8m_clk_enable(int fd)
 static struct soc_specific socs[] = {
     {
         "MX8M",
-        IMX7D_SRC_M4RCR,
-        IMX7D_STOP_CLEAR_MASK,
-        IMX7D_STOP_SET_MASK,
-        IMX7D_START_CLEAR_MASK,
-        IMX7D_START_SET_MASK,
-        IMX7D_MU_ATR1,
+        IMX8MM_SRC_M4RCR,
+        IMX8MM_START_CLEAR_MASK,
+        IMX8MM_START_SET_MASK,
+        IMX8MM_STOP_CLEAR_MASK,
+        IMX8MM_STOP_SET_MASK,
+        IMX8MM_MU_ATR1,
 
         imx8m_clk_enable,
 
