@@ -47,7 +47,9 @@
 #define NAME_OF_UTILITY "i.MX M4 Loader"
 #define HEADER NAME_OF_UTILITY " - M4 firmware loader v. " VERSION "\n"
 
-#define IMX8M_M4_BOOTROM         (0x007E0000) 
+#define IMX8M_M4_BOOTROM         (0x007E0000)
+
+#define IMX8MM_CCM_TARGET_ROOT1  (0x30388080)
 
 #define IMX7D_SRC_M4RCR          (0x3039000C) /* reset register */
 #define IMX7D_STOP_CLEAR_MASK    (0xFFFFFF00)
@@ -162,8 +164,28 @@ void imx7d_clk_enable(int fd)
     LogVerbose("CCM_CCGR1_SET done\n");
 }
 
-void imx8m_clk_enable(int fd) {
+void imx8m_clk_enable(int fd)
+{
+    off_t target;
+    uint32_t read_result;
+    void *map_base, *virt_addr;
 
+    LogVerbose("i.MX8MM specific function for M4 clock enabling!\n");
+
+    /* ENABLE CLK */
+    regshow(IMX8MM_CCM_TARGET_ROOT1, "IMX8MM_CCM_TARGET_ROOT1", fd);
+    target = (off_t)(IMX8MM_CCM_TARGET_ROOT1);
+    map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
+    virt_addr = (unsigned char*)(map_base + (target & MAP_MASK));
+    *((uint32_t*)virt_addr) = 0x14000001;
+    /*                          ||     |-- [POST_PODF] = Post divider divide number = Divide by 2
+     *                          ||-------- [MUX]       = Selection of clock sources = SYSTEM_PLL1_CLK
+     *                          |--------- [ENABLE]    = Enable this clock (ON)
+     */
+
+    munmap(map_base, MAP_SIZE);
+    regshow(IMX8MM_CCM_TARGET_ROOT1, "IMX8MM_CCM_TARGET_ROOT1", fd);
+    LogVerbose("IMX8MM_CCM_TARGET_ROOT1 done\n");
 }
 
 static struct soc_specific socs[] = {
